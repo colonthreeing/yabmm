@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Yabmm
+Comment=Yet Another Balatro Mod Manager
+Type=Application
+Icon=com.github.colonthreeing.yabmm
+Exec=yabmm %F
+Terminal=false
+StartupNotify=true
+Categories=COSMIC
+Keywords=COSMIC
+MimeType=

@@ -1,0 +1,12 @@
+app-title = YABMM
+about = About
+repository = Repository
+view = View
+welcome = Welcome to YABMM!
+welcome_small = Yet Another Balatro Mod Manager
+page-id = Page { $num }
+git-description = Git commit {$hash} on {$date}
+quickopts = Quick Options
+launch = Launch Balatro
+settings = Settings
+download_mods = Download Mods
