@@ -5,7 +5,8 @@ use crate::fl;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
-use cosmic::iced::{Alignment, Length, Subscription};
+use cosmic::iced::{Length, Subscription};
+use cosmic::widget::Id;
 use cosmic::widget::{self, about::About, icon, menu, nav_bar};
 use cosmic::{iced_futures, prelude::*};
 use futures_util::SinkExt;
@@ -35,6 +36,8 @@ pub struct AppModel {
     time: u32,
     /// Toggle the watch subscription
     watch_is_active: bool,
+
+    search_text: String,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -42,8 +45,10 @@ pub struct AppModel {
 pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
-    ToggleWatch,
     LaunchGame,
+    Search(String),
+    SearchPressed,
+    SearchChanged(String),
     UpdateConfig(Config),
     WatchTick(u32),
 }
@@ -98,6 +103,7 @@ impl cosmic::Application for AppModel {
         let about = About::default()
             .name(fl!("app-title"))
             .icon(widget::icon::from_svg_bytes(APP_ICON))
+            .comments(fl!("about_description"))
             .version(env!("CARGO_PKG_VERSION"))
             .links([(fl!("repository"), REPOSITORY)])
             .license(env!("CARGO_PKG_LICENSE"));
@@ -124,6 +130,7 @@ impl cosmic::Application for AppModel {
                 .unwrap_or_default(),
             time: 0,
             watch_is_active: false,
+            search_text: "".to_string(),
         };
 
         // Create a startup command that sets the window title.
@@ -194,15 +201,37 @@ impl cosmic::Application for AppModel {
             }
 
             Page::InstallMods => {
-                let header = widget::row::with_capacity(2)
+                let header = widget::column::with_capacity(2)
                     .push(widget::text::title1(fl!("download_mods")))
                     .spacing(space_s);
 
-                widget::column::with_capacity(1)
+                let search = widget::text_input::search_input(fl!("search_tip"), &self.search_text)
+                    .width(Length::Fill)
+                    .on_input(Message::SearchChanged)
+                    .on_submit(Message::Search)
+                    .always_active();
+
+                let section = cosmic::widget::row::with_capacity(2)
+                    .push(search)
+                    .push(widget::button::text(fl!("search")).on_press(Message::SearchPressed));
+
+                widget::column::with_capacity(2)
                     .push(header)
+                    .push(section)
                     .spacing(space_s)
                     .height(Length::Fill)
                     .into()
+
+                // let header = widget::row::with_capacity(2)
+                //     .push(widget::text::title1(fl!("download_mods")))
+                //     .spacing(space_s);
+
+                // widget::column::with_capacity(2)
+                //     .push(header)
+                //     .push(search)
+                //     .spacing(space_s)
+                //     .height(Length::Fill)
+                //     .into()
             }
 
             Page::Settings => {
@@ -236,7 +265,7 @@ impl cosmic::Application for AppModel {
     /// indefinitely.
     fn subscription(&self) -> Subscription<Self::Message> {
         // Add subscriptions which are always active.
-        let mut subscriptions = vec![
+        let subscriptions = vec![
             // Watch for application configuration changes.
             self.core()
                 .watch_config::<Config>(Self::APP_ID)
@@ -250,20 +279,20 @@ impl cosmic::Application for AppModel {
         ];
 
         // Conditionally enables a timer that emits a message every second.
-        if self.watch_is_active {
-            subscriptions.push(Subscription::run(|| {
-                iced_futures::stream::channel(1, |mut emitter| async move {
-                    let mut time = 0;
-                    let mut interval = tokio::time::interval(Duration::from_secs(1));
+        // if self.watch_is_active {
+        //     subscriptions.push(Subscription::run(|| {
+        //         iced_futures::stream::channel(1, |mut emitter| async move {
+        //             let mut time = 0;
+        //             let mut interval = tokio::time::interval(Duration::from_secs(1));
 
-                    loop {
-                        interval.tick().await;
-                        _ = emitter.send(Message::WatchTick(time)).await;
-                        time += 1;
-                    }
-                })
-            }));
-        }
+        //             loop {
+        //                 interval.tick().await;
+        //                 _ = emitter.send(Message::WatchTick(time)).await;
+        //                 time += 1;
+        //             }
+        //         })
+        //     }));
+        // }
 
         Subscription::batch(subscriptions)
     }
@@ -276,9 +305,6 @@ impl cosmic::Application for AppModel {
         match message {
             Message::WatchTick(time) => {
                 self.time = time;
-            }
-            Message::ToggleWatch => {
-                self.watch_is_active = !self.watch_is_active;
             }
             Message::ToggleContextPage(context_page) => {
                 if self.context_page == context_page {
@@ -302,6 +328,13 @@ impl cosmic::Application for AppModel {
             Message::LaunchGame => {
                 let _ = launch_balatro(true);
             }
+            Message::Search(val) => {
+                println!("searched for {val}")
+            }
+            Message::SearchPressed => {
+                println!("searched for a value idk")
+            }
+            Message::SearchChanged(val) => self.search_text = val,
         }
         Task::none()
     }
@@ -318,12 +351,7 @@ impl cosmic::Application for AppModel {
 impl AppModel {
     /// Updates the header and window titles.
     pub fn update_title(&mut self) -> Task<cosmic::Action<Message>> {
-        let mut window_title = fl!("app-title");
-
-        if let Some(page) = self.nav.text(self.nav.active()) {
-            window_title.push_str(" — ");
-            window_title.push_str(page);
-        }
+        let window_title = fl!("app-title");
 
         if let Some(id) = self.core.main_window_id() {
             self.set_window_title(window_title, id)
